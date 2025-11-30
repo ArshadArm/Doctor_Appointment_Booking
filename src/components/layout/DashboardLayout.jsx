@@ -1,3 +1,4 @@
+// src/components/layout/DashboardLayout.jsx
 import React from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../../services/auth.service";
@@ -10,7 +11,7 @@ export default function DashboardLayout({ children }) {
       <aside className="w-64 p-4 border-r bg-white/60 backdrop-blur">
         <div className="font-bold text-xl mb-4">Doctor Appointment</div>
         <div className="mb-4">
-          Signed in as <div className="font-medium">{user?.name}</div>
+          Signed in as <div className="font-medium">{user?.name ?? "—"}</div>
         </div>
         <nav className="flex flex-col gap-2">
           {user?.role === "admin" && (

@@ -1,26 +1,37 @@
+// src/usecases/appointment.usecase.js
 import { localDb } from "../services/localDb.service";
 
 export const appointmentUsecase = {
-  list() {
-    return localDb.getCollection("appointments");
+  async list() {
+    const list = await localDb.getCollection("appointments");
+    return Array.isArray(list) ? list : [];
   },
-  add(apt) {
-    localDb.add("appointments", apt);
+
+  async add(apt) {
+    if (!apt || typeof apt !== "object") throw new Error("Invalid appointment");
+    if (!apt.id) throw new Error("Appointment must include id");
+    return await localDb.add("appointments", apt);
   },
-  update(id, patch) {
-    localDb.update("appointments", id, patch);
+
+  async update(id, patch) {
+    if (!id) throw new Error("Missing appointment id");
+    return await localDb.update("appointments", id, patch);
   },
-  remove(id) {
-    localDb.remove("appointments", id);
+
+  async remove(id) {
+    if (!id) throw new Error("Missing appointment id");
+    return await localDb.remove("appointments", id);
   },
-  findByDoctor(doctorId) {
-    return localDb
-      .getCollection("appointments")
-      .filter((a) => a.doctorId === doctorId);
+
+  async findByDoctor(doctorId) {
+    const all = await localDb.getCollection("appointments");
+    return Array.isArray(all) ? all.filter((a) => a.doctorId === doctorId) : [];
   },
-  findByPatient(patientId) {
-    return localDb
-      .getCollection("appointments")
-      .filter((a) => a.patientId === patientId);
+
+  async findByPatient(patientId) {
+    const all = await localDb.getCollection("appointments");
+    return Array.isArray(all)
+      ? all.filter((a) => a.patientId === patientId)
+      : [];
   },
 };

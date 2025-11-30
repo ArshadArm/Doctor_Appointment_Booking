@@ -1,28 +1,54 @@
-import React, { useState } from "react";
+// src/pages/admin/Patients.jsx
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import { userUsecase } from "../../usecases/user.usecase";
 import { v4 as uuidv4 } from "uuid";
+import {
+  notifySuccess,
+  notifyError,
+} from "../../services/notification.service";
+import { required } from "../../utils/validators";
 
 export default function AdminPatients() {
-  const [patients, setPatients] = React.useState(
-    userUsecase.list().filter((u) => u.role === "patient")
-  );
+  const [patients, setPatients] = useState([]);
   const [show, setShow] = useState(false);
 
-  function addPatient(e) {
+  async function load() {
+    const list = await userUsecase.list();
+    setPatients(list.filter((u) => u.role === "patient"));
+  }
+
+  useEffect(() => {
+    load();
+    window.addEventListener("dab_db_change", load);
+    return () => window.removeEventListener("dab_db_change", load);
+  }, []);
+
+  async function addPatient(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const name = fd.get("name");
+    const email = fd.get("email");
+    if (!required(name) || !required(email))
+      return notifyError("Name and email required");
     const user = {
       id: "pat-" + uuidv4(),
-      name: fd.get("name"),
+      name,
       role: "patient",
-      email: fd.get("email"),
+      email,
+      password: "patient123",
     };
-    userUsecase.add(user);
-    setPatients(userUsecase.list().filter((u) => u.role === "patient"));
-    setShow(false);
+    try {
+      await userUsecase.add(user);
+      notifySuccess("Patient added");
+      setShow(false);
+      load();
+    } catch (e) {
+      console.error(e);
+      notifyError("Failed to add patient");
+    }
   }
 
   return (

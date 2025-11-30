@@ -1,29 +1,57 @@
-import React, { useState } from "react";
+// src/pages/admin/Doctors.jsx
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import { userUsecase } from "../../usecases/user.usecase";
 import { v4 as uuidv4 } from "uuid";
+import {
+  notifySuccess,
+  notifyError,
+} from "../../services/notification.service";
+import { required } from "../../utils/validators";
 
 export default function AdminDoctors() {
-  const [doctors, setDoctors] = React.useState(
-    userUsecase.list().filter((u) => u.role === "doctor")
-  );
+  const [doctors, setDoctors] = useState([]);
   const [show, setShow] = useState(false);
 
-  function addDoctor(e) {
+  async function load() {
+    const list = await userUsecase.list();
+    setDoctors(list.filter((u) => u.role === "doctor"));
+  }
+
+  useEffect(() => {
+    load();
+    window.addEventListener("dab_db_change", load);
+    return () => window.removeEventListener("dab_db_change", load);
+  }, []);
+
+  async function addDoctor(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const name = fd.get("name");
+    const email = fd.get("email");
+    const specialization = fd.get("specialization");
+
+    if (!required(name) || !required(email))
+      return notifyError("Name and email required");
     const user = {
       id: "doc-" + uuidv4(),
-      name: fd.get("name"),
+      name,
       role: "doctor",
-      email: fd.get("email"),
-      specialization: fd.get("specialization"),
+      email,
+      specialization,
+      password: "doctor123", // default for demo
     };
-    userUsecase.add(user);
-    setDoctors(userUsecase.list().filter((u) => u.role === "doctor"));
-    setShow(false);
+    try {
+      await userUsecase.add(user);
+      notifySuccess("Doctor added");
+      setShow(false);
+      load();
+    } catch (e) {
+      console.error(e);
+      notifyError("Failed to add doctor");
+    }
   }
 
   return (

@@ -1,3 +1,4 @@
+// src/routes.jsx
 import Login from "./pages/auth/Login";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminDoctors from "./pages/admin/Doctors";

@@ -1,30 +1,67 @@
-import React from "react";
+// src/pages/patient/BookAppointment.jsx
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import { localDb } from "../../services/localDb.service";
 import { appointmentUsecase } from "../../usecases/appointment.usecase";
 import { useAuth } from "../../services/auth.service";
 import { v4 as uuidv4 } from "uuid";
+import { required, isDateInPast } from "../../utils/validators";
+import {
+  notifySuccess,
+  notifyError,
+} from "../../services/notification.service";
 
 export default function BookAppointment() {
   const { user } = useAuth();
-  const doctors = localDb
-    .getCollection("users")
-    .filter((u) => u.role === "doctor");
+  const [doctors, setDoctors] = useState([]);
 
-  function book(e) {
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      const u = await localDb.getCollection("users");
+      if (mounted) setDoctors(u.filter((x) => x.role === "doctor"));
+    }
+    load();
+    return () => (mounted = false);
+  }, []);
+
+  async function book(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const doctorId = fd.get("doctorId");
+    const date = fd.get("date");
+    const time = fd.get("time");
+    const reason = fd.get("reason");
+
+    // validation
+    if (
+      !required(doctorId) ||
+      !required(date) ||
+      !required(time) ||
+      !required(reason)
+    ) {
+      return notifyError("All fields are required");
+    }
+    if (isDateInPast(date)) return notifyError("Date cannot be in the past");
+
     const appointment = {
       id: "apt-" + uuidv4(),
       patientId: user.id,
-      doctorId: fd.get("doctorId"),
-      date: fd.get("date"),
-      time: fd.get("time"),
-      reason: fd.get("reason"),
+      doctorId,
+      date,
+      time,
+      reason,
       status: "scheduled",
     };
-    appointmentUsecase.add(appointment);
-    alert("Booked!");
+
+    try {
+      await appointmentUsecase.add(appointment);
+      notifySuccess("Appointment booked");
+      e.target.reset();
+    } catch (err) {
+      console.error(err);
+      notifyError(err.message || "Failed to book");
+    }
   }
 
   return (
@@ -33,9 +70,10 @@ export default function BookAppointment() {
       <form onSubmit={book} className="mt-4 bg-white p-4 rounded shadow w-96">
         <label className="block mb-2">Doctor</label>
         <select name="doctorId" className="w-full p-2 border rounded mb-2">
+          <option value="">Select doctor</option>
           {doctors.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.name} — {d.specialization}
+              {d.name} — {d.specialization ?? "—"}
             </option>
           ))}
         </select>

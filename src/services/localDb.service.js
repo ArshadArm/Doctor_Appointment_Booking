@@ -1,9 +1,9 @@
-// A tiny local DB stored in localStorage under `__dab_db__`
-const STORAGE_KEY = "__dab_db__";
+// src/services/localDb.service.js
+// Tiny local DB stored in localStorage with async-friendly API and change events.
 
-// ------------------------------
-// Default DB with initial users
-// ------------------------------
+const STORAGE_KEY = "__dab_db__";
+const DB_CHANGE_EVENT = "dab_db_change";
+
 const defaultDb = {
   users: [
     {
@@ -19,6 +19,7 @@ const defaultDb = {
       role: "doctor",
       email: "doctor@example.com",
       password: "doctor123",
+      specialization: "General",
     },
     {
       id: "3",
@@ -31,82 +32,79 @@ const defaultDb = {
   appointments: [],
 };
 
-// ------------------------------
-// Read DB safely from localStorage
-// ------------------------------
-function readDB() {
+function readRaw() {
   const raw = localStorage.getItem(STORAGE_KEY);
-
   if (!raw) {
-    writeDB(defaultDb);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultDb));
     return structuredClone(defaultDb);
   }
-
   try {
-    const parsed = JSON.parse(raw);
-
-    // Auto-fix missing or invalid collections
-    const users = Array.isArray(parsed.users)
-      ? parsed.users
-      : structuredClone(defaultDb.users);
-    const appointments = Array.isArray(parsed.appointments)
-      ? parsed.appointments
-      : [];
-
-    // Ensure at least default users exist
-    if (users.length === 0) users.push(...structuredClone(defaultDb.users));
-
-    return { users, appointments };
+    return JSON.parse(raw);
   } catch (e) {
-    console.error("DB parse error, resetting DB", e);
-    writeDB(defaultDb);
+    console.error("localDb parse error:", e);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultDb));
     return structuredClone(defaultDb);
   }
 }
 
-// ------------------------------
-// Write DB safely to localStorage
-// ------------------------------
-function writeDB(db) {
+function writeRaw(db) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  window.dispatchEvent(new Event(DB_CHANGE_EVENT));
 }
 
-// ------------------------------
-// Local DB API
-// ------------------------------
+// small delay to mimic async operations
+function delay(ms = 120) {
+  return new Promise((res) => setTimeout(res, ms));
+}
+
 export const localDb = {
-  getCollection(name) {
-    const db = readDB();
-    return db[name] || [];
+  DB_CHANGE_EVENT,
+
+  async getCollection(name) {
+    await delay();
+    const db = readRaw();
+    return Array.isArray(db[name]) ? structuredClone(db[name]) : [];
   },
 
-  setCollection(name, items) {
-    const db = readDB();
+  async setCollection(name, items) {
+    await delay();
+    const db = readRaw();
     db[name] = Array.isArray(items) ? items : [];
-    writeDB(db);
+    writeRaw(db);
+    return structuredClone(db[name]);
   },
 
-  add(name, item) {
-    const db = readDB();
+  async add(name, item) {
+    if (!item || typeof item !== "object") throw new Error("Invalid item");
+    await delay();
+    const db = readRaw();
     db[name] = db[name] || [];
     db[name].push(item);
-    writeDB(db);
+    writeRaw(db);
+    return item;
   },
 
-  update(name, id, patch) {
-    const db = readDB();
-    db[name] = db[name].map((it) => (it.id === id ? { ...it, ...patch } : it));
-    writeDB(db);
+  async update(name, id, patch) {
+    if (!id) throw new Error("Missing id");
+    await delay();
+    const db = readRaw();
+    db[name] = (db[name] || []).map((it) =>
+      it.id === id ? { ...it, ...patch } : it
+    );
+    writeRaw(db);
+    return db[name].find((it) => it.id === id) || null;
   },
 
-  remove(name, id) {
-    const db = readDB();
-    db[name] = db[name].filter((it) => it.id !== id);
-    writeDB(db);
+  async remove(name, id) {
+    await delay();
+    const db = readRaw();
+    db[name] = (db[name] || []).filter((it) => it.id !== id);
+    writeRaw(db);
+    return true;
   },
 
-  exportJson(filename = "dab-db.json") {
-    const db = readDB();
+  async exportJson(filename = "dab-db.json") {
+    const db = readRaw();
     const blob = new Blob([JSON.stringify(db, null, 2)], {
       type: "application/json",
     });
@@ -124,25 +122,26 @@ export const localDb = {
     try {
       parsed = JSON.parse(txt);
     } catch (e) {
-      alert("Invalid JSON file");
-      console.error("Failed to parse JSON", e);
-      return;
+      throw new Error("Invalid JSON file");
     }
-
     const users = Array.isArray(parsed.users)
       ? parsed.users
       : structuredClone(defaultDb.users);
     const appointments = Array.isArray(parsed.appointments)
       ? parsed.appointments
       : [];
-
-    // Ensure at least default users
     if (users.length === 0) users.push(...structuredClone(defaultDb.users));
-
-    writeDB({ users, appointments });
+    writeRaw({ users, appointments });
+    return true;
   },
 
-  clear() {
-    writeDB(structuredClone(defaultDb));
+  async clear() {
+    await delay();
+    writeRaw(structuredClone(defaultDb));
+  },
+
+  // synchronous getter used in some places for initial render (keeps compatibility)
+  _readSync() {
+    return readRaw();
   },
 };
