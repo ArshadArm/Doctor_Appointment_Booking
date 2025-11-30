@@ -3,10 +3,17 @@ import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import { useAuth } from "../../services/auth.service";
 import { appointmentUsecase } from "../../usecases/appointment.usecase";
+import { localDb } from "../../services/localDb.service";
+import {
+  notifySuccess,
+  notifyError,
+} from "../../services/notification.service";
+import ReportViewer from "../../components/ReportViewer";
 
 export default function PatientDashboard() {
   const { user } = useAuth();
   const [my, setMy] = useState([]);
+  const [viewing, setViewing] = useState(null);
 
   async function load() {
     if (!user) return setMy([]);
@@ -16,9 +23,21 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     load();
-    window.addEventListener("dab_db_change", load);
-    return () => window.removeEventListener("dab_db_change", load);
+    window.addEventListener(localDb.DB_CHANGE_EVENT, load);
+    return () => window.removeEventListener(localDb.DB_CHANGE_EVENT, load);
   }, [user?.id]);
+
+  async function cancelAppointment(id) {
+    if (!window.confirm("Cancel this appointment?")) return;
+    try {
+      await appointmentUsecase.update(id, { status: "cancelled" });
+      notifySuccess("Appointment cancelled");
+      load();
+    } catch (err) {
+      console.error(err);
+      notifyError("Failed to cancel");
+    }
+  }
 
   return (
     <DashboardLayout>
@@ -29,11 +48,46 @@ export default function PatientDashboard() {
           <div className="text-slate-500 mt-2">No appointments yet.</div>
         )}
         {my.map((a) => (
-          <div key={a.id} className="py-2 border-b">
-            {a.date} {a.time} — {a.status}
+          <div
+            key={a.id}
+            className="py-2 border-b flex justify-between items-center"
+          >
+            <div>
+              {a.date} {a.time} — {a.status}
+              {a.report && (
+                <div className="text-xs text-slate-500">Report available</div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {a.status !== "cancelled" && (
+                <button
+                  onClick={() => cancelAppointment(a.id)}
+                  className="px-2 py-1 border rounded"
+                >
+                  Cancel
+                </button>
+              )}
+              {a.report && (
+                <button
+                  onClick={() => setViewing(a)}
+                  className="px-2 py-1 border rounded"
+                >
+                  View Report
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
+
+      {viewing && (
+        <div className="mt-4">
+          <h3 className="font-bold">
+            Report for {viewing.date} {viewing.time}
+          </h3>
+          <ReportViewer report={viewing.report} appointment={viewing} />
+        </div>
+      )}
     </DashboardLayout>
   );
 }

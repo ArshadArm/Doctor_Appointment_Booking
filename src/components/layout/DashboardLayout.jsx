@@ -6,14 +6,19 @@ import { Link } from "react-router-dom";
 
 export default function DashboardLayout({ children }) {
   const { user, logout } = useAuth();
+
   return (
     <div className="min-h-screen flex app-bg">
+      {/* Sidebar */}
       <aside className="w-64 p-4 border-r bg-white/60 backdrop-blur">
         <div className="font-bold text-xl mb-4">Doctor Appointment</div>
         <div className="mb-4">
           Signed in as <div className="font-medium">{user?.name ?? "—"}</div>
         </div>
+
+        {/* Navigation Links */}
         <nav className="flex flex-col gap-2">
+          {/* Admin Links */}
           {user?.role === "admin" && (
             <>
               <Link
@@ -21,6 +26,12 @@ export default function DashboardLayout({ children }) {
                 className="block p-2 rounded hover:bg-slate-100"
               >
                 Dashboard
+              </Link>
+              <Link
+                to="/admin/manage-appointments"
+                className="block p-2 rounded hover:bg-slate-100"
+              >
+                Manage Appointments
               </Link>
               <Link
                 to="/admin/doctors"
@@ -34,8 +45,16 @@ export default function DashboardLayout({ children }) {
               >
                 Patients
               </Link>
+              <Link
+                to="/admin/reports"
+                className="block p-2 rounded hover:bg-slate-100"
+              >
+                Reports
+              </Link>
             </>
           )}
+
+          {/* Doctor Links */}
           {user?.role === "doctor" && (
             <>
               <Link
@@ -50,8 +69,22 @@ export default function DashboardLayout({ children }) {
               >
                 Appointments
               </Link>
+              <Link
+                to="/doctor/submit-report"
+                className="block p-2 rounded hover:bg-slate-100"
+              >
+                Submit Report
+              </Link>
+              <Link
+                to="/doctor/reports"
+                className="block p-2 rounded hover:bg-slate-100"
+              >
+                Reports
+              </Link>
             </>
           )}
+
+          {/* Patient Links */}
           {user?.role === "patient" && (
             <>
               <Link
@@ -69,6 +102,8 @@ export default function DashboardLayout({ children }) {
             </>
           )}
         </nav>
+
+        {/* Logout Button */}
         <div className="mt-8">
           <button onClick={() => logout()} className="text-sm text-red-600">
             Logout
@@ -76,6 +111,7 @@ export default function DashboardLayout({ children }) {
         </div>
       </aside>
 
+      {/* Main Content */}
       <main className="flex-1 p-6">
         <motion.div
           initial={{ opacity: 0, y: 6 }}

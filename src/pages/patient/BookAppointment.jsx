@@ -5,7 +5,7 @@ import { localDb } from "../../services/localDb.service";
 import { appointmentUsecase } from "../../usecases/appointment.usecase";
 import { useAuth } from "../../services/auth.service";
 import { v4 as uuidv4 } from "uuid";
-import { required, isDateInPast } from "../../utils/validators";
+import { required, isDateInPast, isDateToday } from "../../utils/validators";
 import {
   notifySuccess,
   notifyError,
@@ -43,6 +43,21 @@ export default function BookAppointment() {
       return notifyError("All fields are required");
     }
     if (isDateInPast(date)) return notifyError("Date cannot be in the past");
+    if (isDateToday(date))
+      return notifyError(
+        "Same-day appointments are not allowed. Please pick a future date."
+      );
+
+    // check if patient already has an appointment on the selected date
+    try {
+      const myAppts = await appointmentUsecase.findByPatient(user.id);
+      const hasSameDate = myAppts.some((a) => a.date === date);
+      if (hasSameDate)
+        return notifyError("You already have an appointment on this date.");
+    } catch (err) {
+      // continue if error reading appointments
+      console.error(err);
+    }
 
     const appointment = {
       id: "apt-" + uuidv4(),
